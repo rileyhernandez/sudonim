@@ -2,7 +2,7 @@ mod arp;
 mod artist;
 mod device;
 
-use crate::device::DeviceRegistry;
+use crate::device::{DeviceRegistry, get_user_input};
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use std::{io::Write, process::Stdio};
@@ -51,19 +51,32 @@ fn init_config(
     config_directory: &std::path::PathBuf,
     config_file: &std::path::PathBuf,
 ) -> Result<()> {
-    let _ = std::fs::DirBuilder::new()
-        .create(config_directory)
-        .map_err(|_| anyhow!("Failed to make config directory."));
-    let mut file = std::fs::File::create_new(config_file)
-        .map_err(|_| anyhow!("Failed to create config file."))?;
+    let _ = std::fs::DirBuilder::new().create(config_directory);
+    let mut file = match std::fs::File::create_new(config_file) {
+        Ok(file) => Ok(file),
+        Err(_) => {
+            println!("Configuration already exists, would you like to overwrite it? [y/n]");
+            let input = get_user_input("")?;
+            match input.as_ref() {
+                "y" | "Y" | "yes" | "Yes" => std::fs::File::create(config_file)
+                    .map_err(|_| anyhow!("Failed to overwrite file")),
+                _ => Err(anyhow!(
+                    "User declined to overwrite existing configuration."
+                )),
+            }
+        }
+    }?;
     file.write_all(b"[devices]")?;
     println!("Config file initialized!");
     Ok(())
 }
 
 fn list_devices(registry: &DeviceRegistry) -> Result<()> {
-    for device in registry.devices.values() {
-        println!("{device}");
+    let devices = registry.devices.values();
+    if devices.len() == 0 {
+        println!("No devices found. Add new devices with \"new\" command.");
+    } else {
+        for device in devices { println!("{device}") }
     }
     Ok(())
 }

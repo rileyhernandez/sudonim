@@ -121,7 +121,7 @@ impl DeviceRegistry {
     }
 }
 
-fn get_user_input(prompt: &str) -> Result<String> {
+pub fn get_user_input(prompt: &str) -> Result<String> {
     print!("{}", prompt);
     let mut input = String::new();
     io::stdin()
