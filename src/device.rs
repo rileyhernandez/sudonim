@@ -1,8 +1,12 @@
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::io;
 use std::path::PathBuf;
+
+use crate::arp::neigh_show;
+use crate::arp::nmap_scan;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Device {
@@ -21,24 +25,19 @@ impl Default for Device {
         }
     }
 }
+impl fmt::Display for Device {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Device: {}\n  User: {}\n  IP: {}\n  MAC: {}",
+            self.name, self.user, self.ip_address, self.mac_address
+        )
+    }
+}
 impl Device {
     pub fn to_address(&self) -> String {
         format!("{}@{}", self.user, self.ip_address)
     }
-    pub fn from_address(device: &str) -> Result<Self> {
-        let mut split = device.split('@');
-        let user = split.next().ok_or(anyhow!("No user"))?;
-        let ip_address = split.next().ok_or(anyhow!("No ip address"))?;
-        Ok(Self {
-            user: user.into(),
-            ip_address: ip_address.into(),
-            ..Default::default()
-        })
-    }
-    // pub fn read_from_config(config_path: &PathBuf) -> Result<Self> {
-    //     let config_str = std::fs::read_to_string(config_path)?;
-    //     let
-    // }
 }
 
 #[derive(Debug, Deserialize, Serialize, Default)]
@@ -49,7 +48,9 @@ impl DeviceRegistry {
     pub fn load(path: &PathBuf) -> Result<Self> {
         match std::fs::read_to_string(path) {
             Ok(content) => Ok(toml::from_str(&content)?),
-            Err(e) => Err(anyhow!("this failed ig")),
+            Err(_e) => Err(anyhow!(
+                "Failed to load config from path: {path:?} \nMust run \"--init\" to setup."
+            )),
         }
     }
     pub fn save(&self, path: &PathBuf) -> Result<()> {
@@ -67,9 +68,6 @@ impl DeviceRegistry {
     pub fn get_device(&self, name: &str) -> Option<&Device> {
         self.devices.get(name)
     }
-    pub fn list_devices(&self) -> Vec<&Device> {
-        self.devices.values().collect()
-    }
     pub fn input(&mut self) -> Result<()> {
         println!("Enter device user:");
         let user = get_user_input("")?;
@@ -86,6 +84,36 @@ impl DeviceRegistry {
             name,
         };
         self.add_device(device);
+        Ok(())
+    }
+    pub fn edit(&mut self, name: &str) -> Result<()> {
+        if let Some(device) = self.devices.get_mut(name) {
+            println!("Editing: {name}");
+            println!("Enter new IP Address:");
+            let new_ip = get_user_input("")?;
+            device.ip_address = new_ip;
+            println!("IP Address updated successfully!");
+            Ok(())
+        } else {
+            Err(anyhow!("Device not found"))
+        }
+    }
+    pub async fn rescan(&mut self, device: &str) -> Result<()> {
+        let device = self
+            .devices
+            .get_mut(device)
+            .ok_or(anyhow!("Device not found"))?;
+        println!("Old IP Address: {}", device.ip_address);
+        println!("Searching subnet for device with MAC address {}...", device.mac_address);
+        let _map = nmap_scan("192.168.0.0/24").await?;
+        let neighbors = neigh_show().await?;
+        device.ip_address = neighbors
+            .iter()
+            .find(|neighbor| neighbor.mac == device.mac_address)
+            .ok_or(anyhow!("Device not found"))?
+            .ip
+            .clone();
+        println!("New IP Address: {}", device.ip_address);
         Ok(())
     }
 }
