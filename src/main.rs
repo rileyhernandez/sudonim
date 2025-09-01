@@ -21,7 +21,10 @@ async fn main() -> Result<()> {
         }
         Commands::Scan { subnet } => {
             arp::nmap_scan(&subnet).await?;
-            arp::neigh_show().await?;
+            arp::neigh_show()
+                .await?
+                .iter()
+                .for_each(|neighbor| println!("{neighbor}"))
         }
         _ => {
             // Load registry for device operations
