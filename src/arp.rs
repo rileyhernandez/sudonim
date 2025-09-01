@@ -1,4 +1,5 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use std::fmt;
 use tokio::process::Command;
 
 pub async fn nmap_scan(subnet: &str) -> Result<Vec<String>> {
@@ -22,13 +23,17 @@ pub async fn nmap_scan(subnet: &str) -> Result<Vec<String>> {
     Ok(devices)
 }
 pub async fn neigh_show() -> Result<Vec<Neighbor>> {
-    let output = Command::new("ip").arg("neigh").arg("show").output().await.map_err(|_| anyhow!("ip neigh cmd failed :("))?;
+    let output = Command::new("ip")
+        .arg("neigh")
+        .arg("show")
+        .output()
+        .await
+        .map_err(|_| anyhow!("ip neigh cmd failed :("))?;
     let output = String::from_utf8(output.stdout)?;
     let neighbors = output
         .lines()
-        .filter_map(|line| {
-            Neighbor::new(line).ok()
-        }).collect::<Vec<Neighbor>>();
+        .filter_map(|line| Neighbor::new(line).ok())
+        .collect::<Vec<Neighbor>>();
     Ok(neighbors)
 }
 
@@ -46,7 +51,7 @@ impl Neighbor {
         let _lladdr = parts.next().ok_or(anyhow!("Missing lladdr"))?;
         let mac = parts.next().ok_or(anyhow!("Missing MAC address"))?;
         let _status = parts.next().ok_or(anyhow!("Missing status"))?;
-        
+
         // validate ip
         if ip.parse::<std::net::IpAddr>().is_err() {
             return Err(anyhow!("Invalid IP address"));
@@ -55,7 +60,15 @@ impl Neighbor {
         if mac.split(":").count() != 6 {
             return Err(anyhow!("Invalid MAC address"));
         }
-        Ok(Neighbor { ip: ip.to_string(), mac: mac.to_string() })
+        Ok(Neighbor {
+            ip: ip.to_string(),
+            mac: mac.to_string(),
+        })
+    }
+}
+impl fmt::Display for Neighbor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.ip, self.mac)
     }
 }
 

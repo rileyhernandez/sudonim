@@ -98,14 +98,17 @@ impl DeviceRegistry {
             Err(anyhow!("Device not found"))
         }
     }
-    pub async fn rescan(&mut self, device: &str) -> Result<()> {
+    pub async fn rescan(&mut self, device: &str, subnet: &str) -> Result<()> {
         let device = self
             .devices
             .get_mut(device)
             .ok_or(anyhow!("Device not found"))?;
         println!("Old IP Address: {}", device.ip_address);
-        println!("Searching subnet for device with MAC address {}...", device.mac_address);
-        let _map = nmap_scan("192.168.0.0/24").await?;
+        println!(
+            "Searching subnet for device with MAC address {}...",
+            device.mac_address
+        );
+        let _map = nmap_scan(subnet).await?;
         let neighbors = neigh_show().await?;
         device.ip_address = neighbors
             .iter()
