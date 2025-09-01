@@ -32,11 +32,9 @@ pub async fn neigh_show() -> Result<Vec<Neighbor>> {
     Ok(neighbors)
 }
 
-#[derive(Debug)]
 pub struct Neighbor {
     pub ip: String,
     pub mac: String,
-    pub status: String,
 }
 impl Neighbor {
     fn new(neigbor: &str) -> Result<Self> {
@@ -47,7 +45,7 @@ impl Neighbor {
         let _interface = parts.next().ok_or(anyhow!("Missing interface"))?;
         let _lladdr = parts.next().ok_or(anyhow!("Missing lladdr"))?;
         let mac = parts.next().ok_or(anyhow!("Missing MAC address"))?;
-        let status = parts.next().ok_or(anyhow!("Missing status"))?;
+        let _status = parts.next().ok_or(anyhow!("Missing status"))?;
         
         // validate ip
         if ip.parse::<std::net::IpAddr>().is_err() {
@@ -57,7 +55,7 @@ impl Neighbor {
         if mac.split(":").count() != 6 {
             return Err(anyhow!("Invalid MAC address"));
         }
-        Ok(Neighbor { ip: ip.to_string(), mac: mac.to_string(), status: status.to_string() })
+        Ok(Neighbor { ip: ip.to_string(), mac: mac.to_string() })
     }
 }
 

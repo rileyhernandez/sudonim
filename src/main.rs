@@ -2,7 +2,7 @@ mod arp;
 mod artist;
 mod device;
 
-use crate::{arp::neigh_show, device::DeviceRegistry};
+use crate::device::DeviceRegistry;
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use std::{io::Write, process::Stdio};
@@ -65,24 +65,12 @@ async fn main() -> Result<()> {
         registry.rescan(&device).await?;
         registry.save(&config_file)?;
     }
-    if let Some(_device) = cli.neigh {
-        let neighbors = neigh_show().await?;
-        neighbors.iter().for_each(|neighbor| {
-            println!("{neighbor:?}")
-        });
-    }
 
     Ok(())
 }
 
 #[derive(Parser, Debug)]
 struct Cli {
-    #[arg(short, long)]
-    broadcast: Option<String>,
-    #[clap(short, long)]
-    arp: bool,
-    #[arg(short, long)]
-    timeout: Option<isize>,
     #[arg(long)]
     ssh: Option<String>,
     #[arg(long)]
@@ -99,14 +87,4 @@ struct Cli {
     init: bool,
     #[arg(long)]
     rescan: Option<String>,
-    #[arg(long)]
-    neigh: Option<String>,
 }
-
-// #[derive(Debug)]
-// enum EndCondition {
-//     Broadcast,
-//     Timeout,
-//     Arp,
-//     Ssh,
-// }
