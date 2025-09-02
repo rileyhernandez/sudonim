@@ -2,11 +2,12 @@ mod arp;
 mod artist;
 mod device;
 
-use crate::device::{DeviceRegistry, get_user_input};
+use crate::device::{DeviceRegistry, Device, get_user_input};
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use std::{io::Write, process::Stdio};
 use tokio::process::Command;
+use spinners::{Spinner, Spinners};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -33,7 +34,7 @@ async fn main() -> Result<()> {
             match cli.command {
                 Commands::List => list_devices(&registry)?,
                 Commands::Remove { device } => remove_device(&mut registry, &device, &config_file)?,
-                Commands::New => add_new_device(&mut registry, &config_file)?,
+                Commands::New { subnet } => add_new_device(&mut registry, &config_file, &subnet).await?,
                 Commands::Ssh { device } => ssh_to_device(&registry, &device).await?,
                 Commands::Edit { device } => edit_device(&mut registry, &device)?,
                 Commands::Rescan { device, subnet } => {
@@ -76,7 +77,9 @@ fn list_devices(registry: &DeviceRegistry) -> Result<()> {
     if devices.len() == 0 {
         println!("No devices found. Add new devices with \"new\" command.");
     } else {
-        for device in devices { println!("{device}") }
+        for device in devices {
+            println!("{device}")
+        }
     }
     Ok(())
 }
@@ -93,7 +96,45 @@ fn remove_device(
     Ok(())
 }
 
-fn add_new_device(registry: &mut DeviceRegistry, config_file: &std::path::PathBuf) -> Result<()> {
+
+
+async fn add_new_device(
+    registry: &mut DeviceRegistry,
+    config_file: &std::path::PathBuf,
+    subnet: &str
+) -> Result<()> {
+    let mut sp = Spinner::new(Spinners::Mindblown, "Scanning network for available devices...".into());
+    // TODO: maybe only show devices not in registry?
+    let _devices = arp::nmap_scan(subnet).await?;
+    let neighbors = arp::neigh_show().await?;
+    sp.stop();
+    println!("");
+    neighbors.iter().enumerate().for_each(|(index, neighbor)| {
+        println!("{index}: {neighbor}");
+    });
+    println!("Select device to add:");
+    let user_input = get_user_input("")?;
+    println!("Enter new device's user:");
+    let user = get_user_input("")?;
+    println!("Enter name for new device (this is how you will identify it)");
+    let name = get_user_input("")?;
+    let index = user_input
+        .parse::<usize>()
+        .map_err(|_| anyhow!("Invalid index"))?;
+    
+    let selected_device: Device = neighbors
+        .get(index)
+        .map(|neighbor| neighbor.to_device(user, name))
+        .ok_or_else(|| anyhow!("Invalid index"))?;
+    registry.add_device(selected_device);
+    registry.save(config_file)?;
+    Ok(())
+}
+
+fn _add_new_device_from_input(
+    registry: &mut DeviceRegistry,
+    config_file: &std::path::PathBuf,
+) -> Result<()> {
     registry.input()?;
     registry.save(config_file)?;
     Ok(())
@@ -148,7 +189,10 @@ enum Commands {
         #[arg(help = "Device name to remove")]
         device: String,
     },
-    New,
+    New {
+        #[arg(help = "Subnet to scan")]
+        subnet: String,
+    },
     Ssh {
         #[arg(help = "Device name to SSH into")]
         device: String,

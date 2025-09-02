@@ -35,6 +35,14 @@ impl fmt::Display for Device {
     }
 }
 impl Device {
+    pub fn new(user: String, ip_address: String, mac_address: String, name: String) -> Self {
+        Self {
+            user,
+            ip_address,
+            mac_address,
+            name,
+        }
+    }    
     pub fn to_address(&self) -> String {
         format!("{}@{}", self.user, self.ip_address)
     }

@@ -1,5 +1,6 @@
 use anyhow::{Result, anyhow};
 use std::fmt;
+use crate::device::Device;
 use tokio::process::Command;
 
 pub async fn nmap_scan(subnet: &str) -> Result<Vec<String>> {
@@ -64,6 +65,9 @@ impl Neighbor {
             ip: ip.to_string(),
             mac: mac.to_string(),
         })
+    }
+    pub fn to_device(&self, user: String, name: String) -> Device {
+        Device::new(user, self.ip.clone(), self.mac.clone(), name)
     }
 }
 impl fmt::Display for Neighbor {
