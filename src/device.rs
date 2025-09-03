@@ -76,24 +76,6 @@ impl DeviceRegistry {
     pub fn get_device(&self, name: &str) -> Option<&Device> {
         self.devices.get(name)
     }
-    pub fn _input(&mut self) -> Result<()> {
-        println!("Enter device user:");
-        let user = get_user_input("")?;
-        println!("Enter device IP address:");
-        let ip_address = get_user_input("")?;
-        println!("Enter device MAC address:");
-        let mac_address = get_user_input("")?;
-        println!("Create name for device:");
-        let name = get_user_input("")?;
-        let device = Device {
-            user,
-            ip_address,
-            mac_address,
-            name,
-        };
-        self.add_device(device);
-        Ok(())
-    }
     pub fn edit(&mut self, name: &str) -> Result<()> {
         if let Some(device) = self.devices.get_mut(name) {
             println!("Editing: {name}");
@@ -107,24 +89,33 @@ impl DeviceRegistry {
         }
     }
     pub async fn rescan(&mut self, device: &str, subnet: &str) -> Result<()> {
-        let device = self
+        let device_to_rescan = self
             .devices
             .get_mut(device)
-            .ok_or(anyhow!("Device not found"))?;
-        println!("Old IP Address: {}", device.ip_address);
+            .ok_or_else(|| anyhow!("Device '{}' not found in registry", device))?;
+
+        println!("Old IP Address: {}", device_to_rescan.ip_address);
         println!(
             "Searching subnet for device with MAC address {}...",
-            device.mac_address
+            device_to_rescan.mac_address
         );
+
         let _map = nmap_scan(subnet).await?;
         let neighbors = neigh_show().await?;
-        device.ip_address = neighbors
+
+        let new_ip = neighbors
             .iter()
-            .find(|neighbor| neighbor.mac == device.mac_address)
-            .ok_or(anyhow!("Device not found"))?
-            .ip
-            .clone();
-        println!("New IP Address: {}", device.ip_address);
+            .find(|neighbor| neighbor.mac == device_to_rescan.mac_address)
+            .map(|neighbor| neighbor.ip.clone())
+            .ok_or_else(|| {
+                anyhow!(
+                    "Device with MAC address {} not found on the network",
+                    device_to_rescan.mac_address
+                )
+            })?;
+
+        println!("New IP Address: {}", new_ip);
+        device_to_rescan.ip_address = new_ip;
         Ok(())
     }
 }

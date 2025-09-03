@@ -21,29 +21,31 @@ async fn main() -> Result<()> {
             init_config(&config_directory, &config_file)?;
         }
         Commands::Scan { subnet } => {
-            arp::nmap_scan(&subnet).await?;
-            arp::neigh_show()
-                .await?
-                .iter()
-                .for_each(|neighbor| println!("{neighbor}"))
+            scan_network(&subnet).await?;
         }
-        _ => {
-            // Load registry for device operations
+        Commands::List => {
+            let registry = DeviceRegistry::load(&config_file)?;
+            list_devices(&registry)?;
+        }
+        Commands::Remove { device } => {
             let mut registry = DeviceRegistry::load(&config_file)?;
-
-            match cli.command {
-                Commands::List => list_devices(&registry)?,
-                Commands::Remove { device } => remove_device(&mut registry, &device, &config_file)?,
-                Commands::New { subnet } => {
-                    add_new_device(&mut registry, &config_file, &subnet).await?
-                }
-                Commands::Ssh { device } => ssh_to_device(&registry, &device).await?,
-                Commands::Edit { device } => edit_device(&mut registry, &device)?,
-                Commands::Rescan { device, subnet } => {
-                    rescan_device(&mut registry, &device, &subnet, &config_file).await?;
-                }
-                Commands::Init | Commands::Scan { .. } => unreachable!(),
-            }
+            remove_device(&mut registry, &device, &config_file)?;
+        }
+        Commands::New { subnet } => {
+            let mut registry = DeviceRegistry::load(&config_file)?;
+            add_new_device(&mut registry, &config_file, &subnet).await?;
+        }
+        Commands::Ssh { device } => {
+            let registry = DeviceRegistry::load(&config_file)?;
+            ssh_to_device(&registry, &device).await?;
+        }
+        Commands::Edit { device } => {
+            let mut registry = DeviceRegistry::load(&config_file)?;
+            edit_device(&mut registry, &device, &config_file)?;
+        }
+        Commands::Rescan { device, subnet } => {
+            let mut registry = DeviceRegistry::load(&config_file)?;
+            rescan_device(&mut registry, &device, &subnet, &config_file).await?;
         }
     }
 
@@ -68,9 +70,18 @@ fn init_config(
                 )),
             }
         }
-    }?;
+    }?; 
     file.write_all(b"[devices]")?;
     println!("Config file initialized!");
+    Ok(())
+}
+
+async fn scan_network(subnet: &str) -> Result<()> {
+    arp::nmap_scan(subnet).await?;
+    arp::neigh_show()
+        .await?
+        .iter()
+        .for_each(|neighbor| println!("{neighbor}"));
     Ok(())
 }
 
@@ -160,8 +171,13 @@ async fn ssh_to_device(registry: &DeviceRegistry, device_name: &str) -> Result<(
     Ok(())
 }
 
-fn edit_device(registry: &mut DeviceRegistry, device: &str) -> Result<()> {
+fn edit_device(
+    registry: &mut DeviceRegistry,
+    device: &str,
+    config_file: &std::path::PathBuf,
+) -> Result<()> {
     registry.edit(device)?;
+    registry.save(config_file)?;
     Ok(())
 }
 
@@ -201,7 +217,7 @@ enum Commands {
         device: String,
     },
     Edit {
-        #[arg(help = "Device name to edit")]
+        #[arg(help = "Device name to edit IP address for")]
         device: String,
     },
     Rescan {
