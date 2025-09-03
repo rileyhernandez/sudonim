@@ -1,6 +1,6 @@
+use crate::device::Device;
 use anyhow::{Result, anyhow};
 use std::fmt;
-use crate::device::Device;
 use tokio::process::Command;
 
 pub async fn nmap_scan(subnet: &str) -> Result<Vec<String>> {

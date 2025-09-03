@@ -42,7 +42,7 @@ impl Device {
             mac_address,
             name,
         }
-    }    
+    }
     pub fn to_address(&self) -> String {
         format!("{}@{}", self.user, self.ip_address)
     }
@@ -76,7 +76,7 @@ impl DeviceRegistry {
     pub fn get_device(&self, name: &str) -> Option<&Device> {
         self.devices.get(name)
     }
-    pub fn input(&mut self) -> Result<()> {
+    pub fn _input(&mut self) -> Result<()> {
         println!("Enter device user:");
         let user = get_user_input("")?;
         println!("Enter device IP address:");

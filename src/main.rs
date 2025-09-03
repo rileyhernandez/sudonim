@@ -2,12 +2,12 @@ mod arp;
 mod artist;
 mod device;
 
-use crate::device::{DeviceRegistry, Device, get_user_input};
+use crate::device::{Device, DeviceRegistry, get_user_input};
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
+use spinners::{Spinner, Spinners};
 use std::{io::Write, process::Stdio};
 use tokio::process::Command;
-use spinners::{Spinner, Spinners};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,7 +34,9 @@ async fn main() -> Result<()> {
             match cli.command {
                 Commands::List => list_devices(&registry)?,
                 Commands::Remove { device } => remove_device(&mut registry, &device, &config_file)?,
-                Commands::New { subnet } => add_new_device(&mut registry, &config_file, &subnet).await?,
+                Commands::New { subnet } => {
+                    add_new_device(&mut registry, &config_file, &subnet).await?
+                }
                 Commands::Ssh { device } => ssh_to_device(&registry, &device).await?,
                 Commands::Edit { device } => edit_device(&mut registry, &device)?,
                 Commands::Rescan { device, subnet } => {
@@ -96,19 +98,29 @@ fn remove_device(
     Ok(())
 }
 
-
-
 async fn add_new_device(
     registry: &mut DeviceRegistry,
     config_file: &std::path::PathBuf,
-    subnet: &str
+    subnet: &str,
 ) -> Result<()> {
-    let mut sp = Spinner::new(Spinners::Mindblown, "Scanning network for available devices...".into());
-    // TODO: maybe only show devices not in registry?
+    let mut sp = Spinner::new(
+        Spinners::Mindblown,
+        "Scanning network for available devices...".into(),
+    );
+    let existing_macs = registry
+        .devices
+        .values()
+        .map(|device| device.mac_address.clone())
+        .collect::<Vec<_>>();
     let _devices = arp::nmap_scan(subnet).await?;
     let neighbors = arp::neigh_show().await?;
+
     sp.stop();
-    println!("");
+    println!("\n");
+    let neighbors = neighbors
+        .iter()
+        .filter(|neighbor| !existing_macs.contains(&neighbor.mac))
+        .collect::<Vec<_>>();
     neighbors.iter().enumerate().for_each(|(index, neighbor)| {
         println!("{index}: {neighbor}");
     });
@@ -121,21 +133,12 @@ async fn add_new_device(
     let index = user_input
         .parse::<usize>()
         .map_err(|_| anyhow!("Invalid index"))?;
-    
+
     let selected_device: Device = neighbors
         .get(index)
         .map(|neighbor| neighbor.to_device(user, name))
         .ok_or_else(|| anyhow!("Invalid index"))?;
     registry.add_device(selected_device);
-    registry.save(config_file)?;
-    Ok(())
-}
-
-fn _add_new_device_from_input(
-    registry: &mut DeviceRegistry,
-    config_file: &std::path::PathBuf,
-) -> Result<()> {
-    registry.input()?;
     registry.save(config_file)?;
     Ok(())
 }
