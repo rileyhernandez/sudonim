@@ -129,3 +129,65 @@ pub fn get_user_input(prompt: &str) -> Result<String> {
     input.truncate(input.len() - 1);
     Ok(input)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_device_to_address() {
+        let device = Device {
+            user: "testuser".to_string(),
+            ip_address: "192.168.1.100".to_string(),
+            mac_address: "00:11:22:33:44:55".to_string(),
+            name: "test-device".to_string(),
+        };
+        assert_eq!(device.to_address(), "testuser@192.168.1.100");
+    }
+
+    #[test]
+    fn test_add_device() {
+        let mut registry = DeviceRegistry::default();
+        let device = Device::default();
+        registry.add_device(device);
+        assert_eq!(registry.devices.len(), 1);
+        assert!(registry.devices.contains_key("Mingus"));
+    }
+
+    #[test]
+    fn test_remove_device() {
+        let mut registry = DeviceRegistry::default();
+        let device = Device::default();
+        registry.add_device(device);
+        let removed_device = registry.remove_device("Mingus");
+        assert!(removed_device.is_some());
+        assert_eq!(registry.devices.len(), 0);
+    }
+
+    #[test]
+    fn test_get_device() {
+        let mut registry = DeviceRegistry::default();
+        let device = Device::default();
+        registry.add_device(device);
+        let retrieved_device = registry.get_device("Mingus");
+        assert!(retrieved_device.is_some());
+        assert_eq!(retrieved_device.unwrap().name, "Mingus");
+    }
+
+    #[test]
+    fn test_save_and_load_registry() {
+        let mut registry = DeviceRegistry::default();
+        let device = Device::default();
+        registry.add_device(device);
+
+        let tmpfile = NamedTempFile::new().unwrap();
+        let path = tmpfile.path().to_path_buf();
+
+        registry.save(&path).unwrap();
+
+        let loaded_registry = DeviceRegistry::load(&path).unwrap();
+        assert_eq!(loaded_registry.devices.len(), 1);
+        assert!(loaded_registry.devices.contains_key("Mingus"));
+    }
+}

@@ -65,3 +65,23 @@ impl fmt::Display for Neighbor {
         write!(f, "{} ({})", self.ip, self.mac)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_neighbor_new() {
+        let line = "192.168.1.1 dev eth0 lladdr 00:11:22:33:44:55 STALE";
+        let neighbor = Neighbor::new(line).unwrap();
+        assert_eq!(neighbor.ip, "192.168.1.1");
+        assert_eq!(neighbor.mac, "00:11:22:33:44:55");
+    }
+
+    #[test]
+    fn test_neighbor_new_invalid() {
+        let line = "invalid line";
+        let neighbor = Neighbor::new(line);
+        assert!(neighbor.is_err());
+    }
+}
