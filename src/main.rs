@@ -70,7 +70,7 @@ fn init_config(
                 )),
             }
         }
-    }?; 
+    }?;
     file.write_all(b"[devices]")?;
     println!("Config file initialized!");
     Ok(())
